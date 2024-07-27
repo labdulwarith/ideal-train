@@ -1,0 +1,11 @@
+<h1>
+    Home Page
+</h1>
+
+{% for room in rooms %}
+    <h2>{{ room.title }}  @{{ room.host.username}}</h2>
+    {% for message in room.messages %}
+        <p>{{ message }} @{{message.author }}</p>
+        <hr>
+    {% endfor %}
+{% endfor %}
