@@ -1,0 +1,45 @@
+{% if message.title %}
+<h3> {{ message.title }} </h3>
+{% endif %}
+<p>Message: {{ message.body }}</p>
+<p>Author: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a></p>
+
+<form method="POST" action="#">
+    {% csrf_token %}
+     {{ comment_form.as_p }}
+    <button type="submit" name="comment_submit">Post Comment.</button>
+</form>
+
+<form method="POST" action="#">
+    {% csrf_token %}
+    <button type="submit" name="like_submit">
+        {% if user in message.likes.all %}
+            Unlike message
+        {% else %}
+            Like message
+        {% endif %}
+    </button>
+</form>
+
+<h3>Comments</h3>
+<ul>
+    {% for comment in comments %}
+        <li>{{ comment.body }} - {{ comment.created }}</li>
+        <a href="{% url 'user-profile' comment.author.id %}">Author {{ comment.author.username }}</a>
+    {% endfor %}
+</ul>
+
+        {% if user == message.room.host %}
+            <form method="POST" action="#">
+                {% csrf_token %}
+                <button type="submit" name="hide_submit">
+                    {% if message.hidden_status %}
+                        UnHide Message
+                    {% else %}
+                        Hide Message
+                    {% endif %}
+                </button>
+            </form>
+        {% endif %}
+
+<p>Total comments -{{ comments_count }}</p>

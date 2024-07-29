@@ -1,11 +1,41 @@
-<h1>
-    Home Page
-</h1>
+{% if user %}
+    <h4>Welcome {{ user.username }}</h4>
+{% else %}
+    <a href="{% url 'register' %}">Signup</a>
+    <a href="{% url 'login' %}">Login</a>
+{% endif %}
+<hr>
+Total number of rooms: {{ rooms_count }}
 
-{% for room in rooms %}
-    <h2>{{ room.title }}  @{{ room.host.username}}</h2>
-    {% for message in room.messages %}
-        <p>{{ message }} @{{message.author }}</p>
-        <hr>
+<!--Only logged in users should see this panel-->
+{% if user.is_authenticated %}
+
+    <h3>My rooms</h3>
+<!--    List of current logged in user's rooms -->
+    <ul>
+    {% for room in my_rooms %}
+        <li>
+            <a href="{% url 'room' room.id %}">{{ room.title }}</a>
+        </li>
     {% endfor %}
-{% endfor %}
+    </ul>
+    <hr>
+
+{% endif %}
+<!--List of open rooms -->
+    <h3>Open Rooms</h3>
+    <ul>
+        {% for room in open_rooms %}
+            <p>Join Room <a href="{% url 'join-room' room.id %}">{{ room.title }}</a></p>
+        {% endfor %}
+    </ul>
+    <hr>
+<!--List of closed rooms-->
+    <h3>Closed Rooms</h3>
+    <ul>
+        {% for room in closed_rooms %}
+            <p>Ask to join room  <a href="{% url 'join-room' room.id %}">{{ room.title }}</a></p>
+        {% endfor %}
+    </ul>
+
+

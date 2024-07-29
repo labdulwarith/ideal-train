@@ -1,0 +1,46 @@
+<h1>{{ room.title }}</h1>
+
+<p>This room has {{ members_count }} members</p>
+
+<h4>Messages</h4>
+<ul>
+{% for message in room_messages %}
+        {% if message.title %}
+                <p>{{ message.title }}</p>
+        {% endif %}
+        <p>Message: {{ message.body }}</p>
+        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}<a/> -- Likes {{ message.likes.count }}</p>
+        <a href="{%url 'view-message' message.id %}"> Go to message </a>
+        <hr>
+{% endfor %}
+
+
+        {% if user == room.host %}
+        <h3>Hidden Messages</h3>
+                {% for message in hidden_messages %}
+                        {% if message.title %}
+                                <p>{{ message.title }}</p>
+                        {% endif %}
+                        <p>Message: {{ message.body }}</p>
+                        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}<a/></p>
+                        <a href="{%url 'view-message' message.id %}"> Go to message </a>
+                        <hr>
+                {% endfor %}
+
+        <h3>Pending requests</h3>
+        <ul>
+                {% for pending_request in pending_requests %}
+                        <li>
+                            <a href="{% url 'user-profile' pending_request.id %}">{{ pending_request.username }}</a>
+                                <form method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="user" value="{{ pending_request.id }}">
+                                        <button type="submit" name="action" value="accept">Accept request</button>
+                                        <button type="submit" name="action" value="reject">Reject request</button>
+                                </form>
+                        </li>
+                 {% endfor %}
+        </ul>
+        {% endif %}
+</ul>
+

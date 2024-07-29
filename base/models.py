@@ -35,6 +35,7 @@ class Message(models.Model):
     def __str__(self):
         return self.body
 
+
 class Comment(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.ForeignKey(Message, on_delete=models.CASCADE)
@@ -46,7 +47,7 @@ class Comment(models.Model):
     class Meta:
         ordering = ['-created']
 
-
     def __str__(self):
         return self.body
+
 
