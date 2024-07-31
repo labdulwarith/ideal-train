@@ -1,0 +1,12 @@
+<h3>Create a new room</h3>
+<form>
+    {% csrf_token %}
+    {% for field in room_form %}
+        <label>{{ field.label }}</label>
+        {{ field }}
+        <br>
+    {% endfor %}
+    <button type="submit">Save message</button>
+</form>
+
+<a href="{% url 'home' %}"><button>Cancel</button></a>

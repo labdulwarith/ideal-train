@@ -16,6 +16,9 @@ urlpatterns = [
     path('view-message/<str:pk>/', views.message, name='view-message'),
     path('create-message/<str:pk>/', views.create_message, name='create-message'),
 
-
+    path('create-poll/<str:pk>/', views.create_poll, name='create-poll'),
+    path('poll/<str:pk>/', views.poll, name='poll'),
+    path('event/<str:pk>/', views.poll, name='event'),
+    path('create-event/<str:pk>/', views.create_poll, name='create-event'),
     path('user-profile/<str:pk>/', views.user_profile, name='user-profile')
 ]

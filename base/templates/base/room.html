@@ -9,12 +9,28 @@
                 <p>{{ message.title }}</p>
         {% endif %}
         <p>Message: {{ message.body }}</p>
-        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}<a/> -- Likes {{ message.likes.count }}</p>
+        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a> -- Likes {{ message.likes.count }}</p>
         <a href="{%url 'view-message' message.id %}"> Go to message </a>
         <hr>
 {% endfor %}
+<ul>
+        <h3>Events</h3>
+   {% for event in room_events %}
+        <li>
+                <a href="{% url 'event' event.id %}">{{ event.title }}</a>
+        </li>
+        {% endfor %}
+</ul>
 
-
+        <ul>
+        <h3>Polls</h3>
+   {% for poll in room_polls %}
+        <li>
+                <a href="{% url 'poll' poll.id %}">{{ poll.question }}</a>
+        </li>
+        {% endfor %}
+</ul>
+<a href="{% url 'create-message' room.id %}">Create new message</a>
         {% if user == room.host %}
         <h3>Hidden Messages</h3>
                 {% for message in hidden_messages %}
@@ -22,7 +38,7 @@
                                 <p>{{ message.title }}</p>
                         {% endif %}
                         <p>Message: {{ message.body }}</p>
-                        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}<a/></p>
+                        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a></p>
                         <a href="{%url 'view-message' message.id %}"> Go to message </a>
                         <hr>
                 {% endfor %}
@@ -41,6 +57,8 @@
                         </li>
                  {% endfor %}
         </ul>
+        <a href="{% url 'create-poll' room.id %}">Create a new poll?</a>
+        <a href="{% url 'create-event' room.id %}">Create a new event?</a>
         {% endif %}
 </ul>
 

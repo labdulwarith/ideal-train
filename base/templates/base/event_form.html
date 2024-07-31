@@ -1,0 +1,11 @@
+<h4>Create a new event</h4>
+
+<form method="POST" action="#">
+    {% csrf_token %}
+    {% for field in event_form %}
+        <label>{{ field.label }}</label>
+        {{ field }}
+    {% endfor %}
+    <button type="submit">Submit</button>
+</form>
+<a href="{% url 'user-profile' user.id %}"><button>Cancel</button></a>

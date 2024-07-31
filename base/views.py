@@ -1,14 +1,16 @@
-from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import logout, login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
+from django.db.models import F
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
 
-from .forms import RoomForm, CommentForm
-from .models import Room, Message, Comment
+from .forms import RoomForm, CommentForm, MessageForm, PollForm, EventForm
+from .models import Room, Message, Comment, Event, Choice, Poll
+
 # Create your views here.
 
 def home(request):
@@ -80,19 +82,25 @@ def logout_user(request):
 
 @login_required(login_url='login')
 def create_room(request):
-    form = RoomForm()
 
     if request.method == 'POST':
-        pass
-#TODO: define how to save new room
+        room_form = RoomForm(request.POST.get('room_form'))
+        if room_form.is_valid():
+            room = room_form.save(commit=False)
+            room.host = request.user
+            room.save()
+            return redirect('home')
 
-    context = {'form': form}
+    context = {'room_form': Roomform()}
     return render(request, 'base/room_form.html', context)
 
 
 @login_required(login_url='login')
 def room(request, pk):
     room = get_object_or_404(Room, id=pk)
+
+    if not request.user in room.members.all():
+        return HttpResponse('You are not allowed here')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -111,9 +119,8 @@ def room(request, pk):
     members_count = members.count()
     pending_requests = room.pending_requests.all()
     suspended_members = room.suspended_members.all()
-
-    if not request.user in room.members.all():
-        return HttpResponse('You are not allowed here')
+    room_events = room.event_set.all()
+    room_polls = room.poll_set.all()
 
     context = {
         'room': room,
@@ -122,7 +129,9 @@ def room(request, pk):
         'members': members,
         'members_count': members_count,
         'pending_requests': pending_requests,
-        'suspended_members': suspended_members
+        'suspended_members': suspended_members,
+        'room_events': room_events,
+        'room_polls': room_polls
     }
     return render(request, 'base/room.html', context)
 
@@ -202,8 +211,138 @@ def message(request, pk):
 
 @login_required(login_url='login')
 def create_message(request, pk):
-    pass
+    room = get_object_or_404(Room, id=pk)
+
+    if request.method == 'POST':
+        message_form = MessageForm(request.POST)
+        if message_form.is_valid():
+            message = message_form.save(commit=False)
+            message.room = room
+            message.author = request.user
+            message.save()
+            return redirect('view-message', pk=message.id)
+    else:
+        message_form = MessageForm()
+        context = {
+            'message_form': message_form
+        }
+        return render(request, 'base/create_message.html', context)
+
+@login_required(login_url='login')
+def poll(request, pk):
+
+    poll = get_object_or_404(Poll, id=pk)
+    if not request.user in poll.room.members.all():
+        return HttpResponse('You are not allowed here')
+    else:
+        if request.method == 'POST':
+            if 'vote' in request.POST:
+                if request.user in poll.voted_users.all():
+                    return render(
+                        request,
+                        'base/poll.html',
+                        {
+                            'poll': poll,
+                            'error_message': 'You already voted on this poll'
+                        }
+                    )
+
+                try:
+                    selected_choice = poll.choice_set.all(id=request.POST['choice'])
+
+                except(KeyError, Choice.DoesNotExist):
+                    return render(
+                        request,
+                        'base/poll.html',
+                        {
+                            'poll': poll,
+                            'error_message': 'You did not select a choice'
+                        }
+                    )
+                else:
+                    selected_choice.votes = F('votes') + 1
+                    selected_choice.save()
+                    poll.voted_users.add(request.user)
+                    poll.save()
+                    return render(
+                        request,
+                        'base/poll.html',
+                        {
+                            'poll': poll,
+                            'error_message': 'You already voted on this poll'
+                        }
+                    )
+        context = {
+                'poll': poll
+            }
+        return render(request, 'base/poll.html', context)
 
 
+@login_required
+def create_poll(request, pk):
+    poll_room = get_object_or_404(Room, id=pk)
+    if not poll_room.host == request.user:
+        return HttpResponse('You are not allowed to make this request')
+
+    if request.method == 'POST':
+        poll_form = PollForm(request.POST.get('poll_form'))
+        if poll_form.is_valid():
+            poll = poll_form.save(commit=False)
+            poll.created_by = request.user
+            poll.room = poll_room
+            poll.save()
+            return redirect('poll', pk=poll.id)
+    else:
+        poll_form = PollForm()
+        context = {
+            'poll_form': poll_form
+        }
+        render(request, 'base/poll_form.html', context)
 
 
+@login_required(login_url='login')
+def event(request, pk):
+    event = get_object_or_404(Event, id=pk)
+    if not request.user in event.room_set.all().members:
+        return HttpResponse('You are not allowed to make this request')
+
+    if request.method == 'POST':
+        if event.has_ended():
+            return HttpResponse('Event has ended')
+        if request.user in event.accepted_set.all() or request.user in event.rejected_set.all():
+            return render(request, 'base/event.html', {
+                'event': event,
+                'error_message': 'You already accepted or rejected this event'
+            })
+        else:
+            if 'accepted' in request.POST:
+                #TODO: Send a notification to user
+                event.accepted.add(request.user)
+            elif 'rejected' in request.POST:
+                #TODO: Do not send notification
+                event.rejected.add(request.user)
+            return redirect('event', event.id)
+    else:
+        context = {'event': event}
+        return render(request, 'base/event.html', context)
+@login_required(login_url='login')
+def create_event(request, pk):
+    event_room = get_object_or_404(Room, id=pk)
+    if not event_room.host == request.user:
+        return HttpResponse('You are not allowed to make this request')
+
+    if request.method == 'POST':
+        event_form = EventForm(request.POST.get('event_form'))
+        if event_form.is_valid():
+            event = event_form.save(commit=False)
+            event.created_by = request.user
+            event.room = event_room
+            event.save()
+
+            return redirect('event', pk=event.id)
+    else:
+        event_form = EventForm()
+        context = {
+            'event_form': event_form
+        }
+        return render(request, 'base/event_form.html', context)

@@ -1,0 +1,23 @@
+{% if error_message %}
+<h4>{{ error_message }}</h4>
+{% endif %}
+<legend><h3>{{ event.title }}</h3></legend>
+{% if event.description %}<h4>Description {{ event.description}}</h4><br/>{% endif %}
+
+{% if not event.has_started %}
+    {% if user in event.rejected_set.all %}
+        <p>Already accepted</p>
+    {% elif user in event.accepted_set.all %}
+        <p>Already rejected</p>
+    {% else %}
+        <form method="POST" action="#">
+            {% csrf_token %}
+            <button type="submit" name="accepted">Accept Invite</button>
+            <button type="submit" name="rejected">Reject Invite</button>
+        </form>
+    {% endif %}
+{% elif event.has_started and not event.has_ended %}
+    <h4>Event ongoing </h4>
+{% else %}
+    <h4>Event ended </h4>
+{% endif %}

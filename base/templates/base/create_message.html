@@ -1,0 +1,13 @@
+<h4>Create a new message</h4>
+
+<form method="POST" action="#">
+    {% csrf_token %}
+    {% for field in message_form %}
+        <div>
+            <label>{{ field.label }}</label>
+            {{ field }}
+        </div>
+    {% endfor %}
+    <a href="{% url 'home' %}">Cancel</a>
+    <button type="submit">Save message</button>
+</form>

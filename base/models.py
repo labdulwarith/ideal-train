@@ -1,7 +1,8 @@
+from django.utils import timezone
+
 from django.db import models
 from django.contrib.auth.models import User
 # Create your models here.
-
 
 class Room(models.Model):
     title = models.CharField(max_length=200)
@@ -50,4 +51,49 @@ class Comment(models.Model):
     def __str__(self):
         return self.body
 
+class Event(models.Model):
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    rejected = models.ManyToManyField(User, related_name='rejected')
+    accepted = models.ManyToManyField(User, related_name='accepted')
+    starts_at = models.DateTimeField('Start time of event')
+    expires_at = models.DateTimeField('End time of event')
 
+    def has_started(self):
+        return timezone.now() > self.starts_at
+
+    def has_ended(self):
+        return timezone.now() > self.expires_at
+
+    class Meta:
+        ordering = ['expires_at', '-starts_at']
+
+class Poll(models.Model):
+    question = models.CharField(max_length=200)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    starts_at = models.DateTimeField('Start time of poll')
+    expires_at = models.DateTimeField('End time of voting')
+    voted_users = models.ManyToManyField(User, related_name='voted_users')
+
+    def __str__(self):
+        return self.question
+
+    def has_started(self):
+        return timezone.now() > self.starts_at
+
+    def has_ended(self):
+        return timezone.now() > self.expires_at
+
+    class Meta:
+        ordering = ['expires_at', '-starts_at']
+class Choice(models.Model):
+    text = models.CharField(max_length=200)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+    votes = models.IntegerField(default=0)
+    def __str__(self):
+        return self.text
+    class Meta:
+        ordering = ['votes', '-text']
