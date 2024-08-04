@@ -1,13 +1,15 @@
-from django.utils import timezone
-
-from django.db import models
+from enum import Enum
 from django.contrib.auth.models import User
+from django import forms
+from django.db import models
+from django.utils import timezone
 # Create your models here.
 
 class Room(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
     host = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    admins = models.ManyToManyField(User, related_name='admins', blank=True)
     members = models.ManyToManyField(User, related_name='members', blank=True)
     open_status = models.BooleanField(default=True)
     updated = models.DateTimeField(auto_now=True)
@@ -56,10 +58,14 @@ class Event(models.Model):
     description = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
-    rejected = models.ManyToManyField(User, related_name='rejected')
-    accepted = models.ManyToManyField(User, related_name='accepted')
+    rejected = models.ManyToManyField(User, related_name='rejected', blank=True)
+    accepted = models.ManyToManyField(User, related_name='accepted', blank=True)
     starts_at = models.DateTimeField('Start time of event')
     expires_at = models.DateTimeField('End time of event')
+
+
+    def __str__(self):
+        return self.title
 
     def has_started(self):
         return timezone.now() > self.starts_at
@@ -76,7 +82,7 @@ class Poll(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     starts_at = models.DateTimeField('Start time of poll')
     expires_at = models.DateTimeField('End time of voting')
-    voted_users = models.ManyToManyField(User, related_name='voted_users')
+    voted_users = models.ManyToManyField(User, related_name='voted_users', blank=True)
 
     def __str__(self):
         return self.question
@@ -89,11 +95,45 @@ class Poll(models.Model):
 
     class Meta:
         ordering = ['expires_at', '-starts_at']
+
 class Choice(models.Model):
     text = models.CharField(max_length=200)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
     votes = models.IntegerField(default=0)
+
     def __str__(self):
         return self.text
     class Meta:
         ordering = ['votes', '-text']
+
+ACTION_TYPE = (
+    ('c', 'commented'),
+    ('l', 'liked')
+)
+
+class Notification(models.Model):
+    read_status = models.BooleanField(default=False)
+    action_by = models.ForeignKey(User, related_name='action_by', on_delete=models.CASCADE)
+    action_to = models.ForeignKey(User, related_name='action_to', on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    action_type = models.CharField(
+        max_length=1,
+        choices=ACTION_TYPE,
+        default='c',
+        help_text='Description of notification'
+    )
+
+class AdminNotification(models.Model):
+    read_status = models.BooleanField(default=False)
+    action_by = models.ForeignKey(User, related_name='admin_action_by', on_delete=models.CASCADE)
+    action_to = models.ForeignKey(User, related_name='admin_action_to', on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE)
+    action_type = models.CharField(
+        max_length=1,
+        choices=ACTION_TYPE,
+        default='c',
+        help_text='Description of admin notification'
+    )
+

@@ -1,11 +1,21 @@
-<h4>Create a new event</h4>
+{% extends 'main.html' %}
+{% block content %}
+<main class="container">
+    <div></div>
+    <div class="middle-column">
+        <h4>Create a new event</h4>
 
-<form method="POST" action="#">
-    {% csrf_token %}
-    {% for field in event_form %}
-        <label>{{ field.label }}</label>
-        {{ field }}
-    {% endfor %}
-    <button type="submit">Submit</button>
-</form>
-<a href="{% url 'user-profile' user.id %}"><button>Cancel</button></a>
+        <form method="POST" action="#">
+            {% csrf_token %}
+            {% for field in event_form %}
+                <label>{{ field.label }}</label>
+                {{ field }}
+            {% endfor %}
+            <button type="submit" class="btn">Submit</button>
+            <a href="{% url 'user-profile' user.id %}"><button class="btn">Cancel</button></a>
+        </form>
+
+    </div>
+    <div></div>
+</main>
+{% endblock %}

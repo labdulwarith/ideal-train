@@ -1,27 +1,40 @@
-<legend><h3>{{ poll.question }}</h3></legend>
-{% if not poll.has_started %}
-    <p>This poll has not started come back later.</p>
-{% else %}
-{% if poll.has_ended %}
+{% extends 'main.html' %}
+{% block content %}
+<main class="container">
+    <div></div>
+    <div class="middle-column">
+        <legend><h3>{{ poll.question }}</h3></legend>
+        {% if not poll.has_started %}<p>This poll has not started come back later.</p>{% else %}
+        {% if poll.has_ended %}
         <h3>Poll results:</h3><br>
         {% for choice in poll.choice_set.all %}
             <h4>{{ choice }} -- {{ choice.votes }} vote{{ choice.votes|pluralize }}</h4>
         {% endfor %}
-    {% else %}
-    {% if error_message %}
-        <p><strong>{{ error_message }}</strong></p>
-    {% endif %}
-    <form method="POST" action="#">
-        {% csrf_token %}
-        <fieldset>
-            <p>size of choice set {{ poll.choice_set.all.count }}</p>
-            {% for choice in poll.choice_set.all %}
-                <input type="radio" name="choice" id="choice{{ forloop.counter }}" value="{{ choice.id }}">
-                <label for="choice{{ forloop.counter }}">{{ choice.text }}</label><br>
-            {% endfor %}
-        </fieldset>
-            <input type="submit" name="vote"/>
-    </form>
-    {% endif %}
-{% endif %}
+        {% else %}
+            {% if error_message %}
+            <p><strong>{{ error_message }}</strong></p>
+            {% endif %}
+                <form method="POST" action="#" class="">
+            {% csrf_token %}
+            <fieldset>
+                <p>size of choice set {{ poll.choice_set.all.count }}</p>
+                {% for choice in poll.choice_set.all %}
+                    <input type="radio" name="choice" id="choice{{ forloop.counter }}" value="{{ choice.id }}">
+                    <label for="choice{{ forloop.counter }}">{{ choice.text }}</label><br>
+                {% endfor %}
+            </fieldset>
+            <input type="submit" name="vote" class="btn"/>
+            </form>
+
+        {% endif %}
+        {% endif %}
+    </div>
+
+
+    <div></div>
+</main>
+
+{% endblock %}
+
+
 

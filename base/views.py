@@ -2,35 +2,78 @@ from django.contrib import messages
 from django.contrib.auth import logout, login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
-from django.db.models import F
+from django.db.models import F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
 
 from .forms import RoomForm, CommentForm, MessageForm, PollForm, EventForm
-from .models import Room, Message, Comment, Event, Choice, Poll
+from .models import Room, Message, Comment, Event, Choice, Poll, Notification, AdminNotification
 
 # Create your views here.
 
+def save_notification(
+                      room: Room,
+                      action_by: User,
+                      message: Message,
+                      action_to: User,
+                      action_type: str,
+                      ) -> None:
+    user_notification = Notification(
+        action_by=action_by,
+        action_to=action_to,
+        room=room,
+        message=message,
+        action_type=action_type
+    )
+    admin_notification = AdminNotification(
+        action_by=action_by,
+        action_to=action_to,
+        room=room,
+        message=message,
+        action_type=action_type
+    )
+
+    user_notification.save()
+    admin_notification.save()
+
 def home(request):
-    my_rooms = []
-    if request.user.is_authenticated:
-        #TODO: Return rooms where user logged in user is a member
+    my_rooms, admin_notifications, notifications = [], [], []
+
+    if not request.user.is_authenticated:
+        open_rooms = Room.objects.filter(open_status=True)
+        closed_rooms = Room.objects.filter(open_status=False)
+    else:
+        if request.method == 'POST':
+            if 'read-notification' in request.POST:
+                notification = Notification.objects.get(id=request.POST.get('notification_id'))
+                notification.read_status = True
+                notification.save()
+            elif 'read-admin-notification' in request.POST:
+                admin_notification = AdminNotification.objects.get(id=request.POST.get('admin_notification_id'))
+                admin_notification.read_status = True
+                admin_notification.save()
+            return redirect('home')
         my_rooms = Room.objects.filter(members=request.user)
         open_rooms = Room.objects.exclude(members=request.user).filter(open_status=True)
         closed_rooms = Room.objects.exclude(members=request.user).filter(open_status=False)
-    else:
-        open_rooms = Room.objects.filter(open_status=True)
-        closed_rooms = Room.objects.filter(open_status=False)
-
+        notifications = Notification.objects.filter(action_to=request.user, read_status=False)
+        admin_notifications = AdminNotification.objects.filter(room__admins=request.user, read_status=False)
     rooms_count = Room.objects.all().count()
-
+    q = request.GET.get('q') if request.GET.get('q') != None else ''
+    search_rooms = Room.objects.filter(
+        Q(title__icontains=q) |
+        Q(description__icontains=q)
+    )[0:5]
     context = {
         'my_rooms': my_rooms,
         'open_rooms': open_rooms,
         'closed_rooms': closed_rooms,
-        'rooms_count': rooms_count
+        'rooms_count': rooms_count,
+        'search_rooms': search_rooms,
+        'notifications': notifications,
+        'admin_notifications': admin_notifications
     }
     return render(request, 'base/home.html', context)
 
@@ -79,6 +122,9 @@ def logout_user(request):
     logout(request)
     return redirect('home')
 
+@login_required(login_url='login')
+def update_user(request):
+    pass
 
 @login_required(login_url='login')
 def create_room(request):
@@ -94,6 +140,14 @@ def create_room(request):
     context = {'room_form': Roomform()}
     return render(request, 'base/room_form.html', context)
 
+
+@login_required(login_url='login')
+def update_poll(request, pk):
+    pass
+
+@login_required(login_url='login')
+def update_room(request, pk):
+    pass
 
 @login_required(login_url='login')
 def room(request, pk):
@@ -149,7 +203,6 @@ def join_room(request, pk):
     room.members.add(request.user)
     return redirect('room', pk=room.id)
 
-
 @login_required(login_url='login')
 def delete_room(request, pk):
     room = Room.objects.get(id=pk)
@@ -183,12 +236,26 @@ def message(request, pk):
                 comment.author = request.user
                 comment.message = message
                 comment.save()
+                save_notification(
+                    room=message.room,
+                    action_by=request.user,
+                    action_to=message.author,
+                    message=message,
+                    action_type='c'
+                )
         elif 'like_submit' in request.POST:
             if request.user in message.likes.all():
                 message.likes.remove(request.user)
             else:
                 message.likes.add(request.user)
             message.save()
+            save_notification(
+                room=message.room,
+                action_by=request.user,
+                action_to=message.author,
+                message=message,
+                action_type='l'
+            )
         elif 'hide_submit' in request.POST:
                 message.hidden_status = not message.hidden_status
                 message.save()
@@ -220,7 +287,8 @@ def create_message(request, pk):
             message.room = room
             message.author = request.user
             message.save()
-            return redirect('view-message', pk=message.id)
+
+            return redirect('message', pk=message.id)
     else:
         message_form = MessageForm()
         context = {
@@ -248,7 +316,7 @@ def poll(request, pk):
                     )
 
                 try:
-                    selected_choice = poll.choice_set.all(id=request.POST['choice'])
+                    selected_choice = poll.choice_set.get(id=request.POST['choice'])
 
                 except(KeyError, Choice.DoesNotExist):
                     return render(
@@ -277,11 +345,10 @@ def poll(request, pk):
             }
         return render(request, 'base/poll.html', context)
 
-
-@login_required
+@login_required(login_url='login')
 def create_poll(request, pk):
     poll_room = get_object_or_404(Room, id=pk)
-    if not poll_room.host == request.user:
+    if not request.user in poll_room.admins.all():
         return HttpResponse('You are not allowed to make this request')
 
     if request.method == 'POST':
@@ -297,13 +364,11 @@ def create_poll(request, pk):
         context = {
             'poll_form': poll_form
         }
-        render(request, 'base/poll_form.html', context)
-
-
+        return render(request, 'base/poll_form.html', context)
 @login_required(login_url='login')
 def event(request, pk):
     event = get_object_or_404(Event, id=pk)
-    if not request.user in event.room_set.all().members:
+    if not request.user in event.room.members.all():
         return HttpResponse('You are not allowed to make this request')
 
     if request.method == 'POST':
@@ -325,10 +390,11 @@ def event(request, pk):
     else:
         context = {'event': event}
         return render(request, 'base/event.html', context)
+
 @login_required(login_url='login')
 def create_event(request, pk):
     event_room = get_object_or_404(Room, id=pk)
-    if not event_room.host == request.user:
+    if not request.user in event_room.admins.all():
         return HttpResponse('You are not allowed to make this request')
 
     if request.method == 'POST':

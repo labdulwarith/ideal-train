@@ -1,13 +1,31 @@
-<h4>Create a new message</h4>
+{% extends 'main.html' %}
+{% block content %}
 
-<form method="POST" action="#">
-    {% csrf_token %}
-    {% for field in message_form %}
-        <div>
-            <label>{{ field.label }}</label>
-            {{ field }}
+<main class="container">
+    <div class="left-column">
+
+    </div>
+    <div class="middle-column">
+            <h3>Create a new message</h3>
+            <div class="form-container">
+                <form method="POST" action="#">
+                    {% csrf_token %}
+                    {% for field in message_form %}
+                    <div class="form-group">
+                        <label>{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                    <div class="form-group">
+                        <a href="{% url 'home' %}"><button class="cancel-btn btn">Cancel</button></a>
+                        <button type="submit" class="btn">Save message</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    {% endfor %}
-    <a href="{% url 'home' %}">Cancel</a>
-    <button type="submit">Save message</button>
-</form>
+        <div class="right-column">
+        </div>
+</main>
+
+{% endblock %}
+

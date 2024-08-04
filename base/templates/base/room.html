@@ -1,64 +1,101 @@
-<h1>{{ room.title }}</h1>
+{% extends 'main.html' %}
+{% block content %}
+    <main class="container">
+        <div class="left-column">
+            <h2>{{ room.title }}</h2>
+            <h4>{{ members_count }} members in this room</h4>
 
-<p>This room has {{ members_count }} members</p>
+            <section class="card-list">
+                {% if not user in room.suspended_members %}
+                    <a href="{% url 'create-message' room.id %}" class="card-wrapper">
+                        <div class="card">
+                            <h3>Create a message?</h3>
+                        </div>
+                    </a>
+                {% endif %}
+            </section>
 
-<h4>Messages</h4>
-<ul>
-{% for message in room_messages %}
-        {% if message.title %}
-                <p>{{ message.title }}</p>
-        {% endif %}
-        <p>Message: {{ message.body }}</p>
-        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a> -- Likes {{ message.likes.count }}</p>
-        <a href="{%url 'view-message' message.id %}"> Go to message </a>
-        <hr>
-{% endfor %}
-<ul>
-        <h3>Events</h3>
-   {% for event in room_events %}
-        <li>
-                <a href="{% url 'event' event.id %}">{{ event.title }}</a>
-        </li>
-        {% endfor %}
-</ul>
+            <section class="card-list">
+                {% if user in room.admins.all and pending_requests %}
+                <h3>Pending requests</h3>
+                {% for pending_request in pending_requests %}
+                <div class="card">
+                    <h4><a href="{% url 'user-profile' pending_request.id %}">{{ pending_request.username }}</a></h4>
+                    <form method="POST" action="#">
+                        {% csrf_token %}
+                        <input type="hidden" name="user" value="{{ pending_request.id }}">
+                        <button type="submit" name="action" value="accept" class="btn">Accept request</button>
+                        <button type="submit" name="action" value="reject" class="btn">Reject request</button>
+                    </form>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </section>
+        </div>
+        <div class="messages middle-column">
+            <section class="card-list">
+            <h2>Messages</h2>
+                {% for message in room_messages %}
+                <a href="{% url 'message' message.id %}" class="card-wrapper">
+                    <div class="card">
+                        {% if message.title %}<h3>{{ message.title }}</h3>{% endif %}
+                        <h4>{{ message.body }}</h4>
+                        <p>Author: {{ message.author.username }}</p>
+                    </div>
+                </a>
+            {% endfor %}
+            </section>
 
-        <ul>
-        <h3>Polls</h3>
-   {% for poll in room_polls %}
-        <li>
-                <a href="{% url 'poll' poll.id %}">{{ poll.question }}</a>
-        </li>
-        {% endfor %}
-</ul>
-<a href="{% url 'create-message' room.id %}">Create new message</a>
-        {% if user == room.host %}
-        <h3>Hidden Messages</h3>
+            {% if hidden_messages %}
+            <section class="card-list">
+            <h2>Hidden Messages</h2>
                 {% for message in hidden_messages %}
-                        {% if message.title %}
-                                <p>{{ message.title }}</p>
-                        {% endif %}
-                        <p>Message: {{ message.body }}</p>
-                        <p>By: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a></p>
-                        <a href="{%url 'view-message' message.id %}"> Go to message </a>
-                        <hr>
+                <a href="{% url 'message' message.id %}" class="card-wrapper">
+                    <div class="card">
+                        <h3>{{ message.title }} by {{ message.author.username }}</h3>
+                        <p>{{ message.body }}</p>
+                    </div>
+                </a>
+                {% endfor %}
+            </section>
+            {% endif %}
+        </div>
+        <div class="right-column">
+            <section class="card-list">
+                <h2>Events</h2>
+                {% for event in room_events %}
+                <a href="{% url 'event' event.id %}" class="card-wrapper">
+                    <div class="card">
+                        <h3>{{ event.title }} by {{ event.created_by.username }}</h3>
+                        <p>{{ event.description }}</p>
+                    </div>
+                </a>
                 {% endfor %}
 
-        <h3>Pending requests</h3>
-        <ul>
-                {% for pending_request in pending_requests %}
-                        <li>
-                            <a href="{% url 'user-profile' pending_request.id %}">{{ pending_request.username }}</a>
-                                <form method="POST">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="user" value="{{ pending_request.id }}">
-                                        <button type="submit" name="action" value="accept">Accept request</button>
-                                        <button type="submit" name="action" value="reject">Reject request</button>
-                                </form>
-                        </li>
-                 {% endfor %}
-        </ul>
-        <a href="{% url 'create-poll' room.id %}">Create a new poll?</a>
-        <a href="{% url 'create-event' room.id %}">Create a new event?</a>
-        {% endif %}
-</ul>
+                {% if user in room.admins.all %}
+                <a href="{% url 'create-event' room.id %}">
+                    <button class="btn">Create an event</button>
+                </a>
+                {% endif %}
+            </section>
 
+            <section class="card-list">
+                <h2>Polls</h2>
+                {% for poll in room_polls %}
+                <a href="{% url 'poll' poll.id %}" class="card-wrapper">
+                    <div class="card">
+                        <h4>{{ poll.question }} by {{ poll.created_by.username }}</h4>
+                    {% if user in poll.voted_users.all %}<p>Already voted</p>{% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+
+                {% if user in room.admins.all %}
+                <a href="{% url 'create-poll' room.id %}">
+                    <button class="btn">Create a poll?</button>
+                </a>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+{% endblock %}

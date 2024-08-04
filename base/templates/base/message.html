@@ -1,35 +1,29 @@
-{% if message.title %}
-<h3> {{ message.title }} </h3>
-{% endif %}
-<p>Message: {{ message.body }}</p>
-<p>Author: <a href="{% url 'user-profile' message.author.id %}">{{ message.author.username }}</a></p>
+{% extends 'main.html' %}
 
-<form method="POST" action="#">
-    {% csrf_token %}
-     {{ comment_form.as_p }}
-    <button type="submit" name="comment_submit">Post Comment.</button>
-</form>
+{% block content %}
 
-<form method="POST" action="#">
-    {% csrf_token %}
-    <button type="submit" name="like_submit">
-        {% if user in message.likes.all %}
-            Unlike message
-        {% else %}
-            Like message
-        {% endif %}
-    </button>
-</form>
+<main class="container">
+    <div class="left-column">
+        <div>
+            <h4>Total comments -{{ comments_count }}</h4>
+            <h4>Total likes  - {{ likes_count }}</h4>
+        </div>
 
-<h3>Comments</h3>
-<ul>
-    {% for comment in comments %}
-        <li>{{ comment.body }} - {{ comment.created }}</li>
-        <a href="{% url 'user-profile' comment.author.id %}">Author {{ comment.author.username }}</a>
-    {% endfor %}
-</ul>
+        <div>
+            <form method="POST" action="#">
+                {% csrf_token %}
+                <button type="submit" name="like_submit">
+                {% if user in message.likes.all %}
+                    Unlike message
+                {% else %}
+                    Like message
+                {% endif %}
+                </button>
+            </form>
+        </div>
 
-        {% if user == message.room.host %}
+        {% if user in message.room.admins.all %}
+        <div>
             <form method="POST" action="#">
                 {% csrf_token %}
                 <button type="submit" name="hide_submit">
@@ -40,6 +34,37 @@
                     {% endif %}
                 </button>
             </form>
+        </div>
         {% endif %}
+    </div>
+    <div class="middle-column">
+        {% if message.title %}
+        <h2> {{ message.title }}</h2>
+        {% endif %}
+        <h4>{{ message.body }}</h4>
+        <p>From: <a href="{% url 'user-profile' message.author.id %}"> {{ message.author.username }}</a></p>
+        <p>Posted {{ message.created|timesince }} ago</p>
+    </div>
 
-<p>Total comments -{{ comments_count }}</p>
+    <div class="right-column">
+        <section class="card-list">
+            <h2>Comments</h2>
+            {% for comment in comments %}
+                <div class="card">
+                    <h4>{{ comment.body }}</h4>
+                    <p>Posted: {{ comment.created|timesince }} ago</p>
+                    <p>By: <a href="{% url 'user-profile' comment.author.id %}">{{ comment.author.username }}</a></p>
+                </div>
+            {% endfor %}
+
+            <div>
+                <form method="POST" action="#">
+                    {% csrf_token %}
+                    {{ comment_form.as_p }}
+                    <button type="submit" name="comment_submit">Post Comment</button>
+                </form>
+            </div>
+        </section>
+    </div>
+</main>
+{% endblock %}

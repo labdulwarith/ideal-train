@@ -1,4 +1,4 @@
-from django.forms import ModelForm
+from django.forms import ModelForm, DateTimeInput
 from .models import Room, Comment, Poll, Message, Event
 
 from django.contrib.auth.models import User
@@ -33,9 +33,26 @@ class PollForm(ModelForm):
         model = Poll
         fields = '__all__'
         exclude = ['created_by', 'voted_users', 'room']
+        widgets = {
+            'starts_at': DateTimeInput(attrs={
+                'type':'datetime-local'
+            }),
+            'expires_at': DateTimeInput(attrs={
+                'type': 'datetime-local'
+            })
+        }
 
 
 class EventForm(ModelForm):
     class Meta:
         model = Event
         exclude = ['created_by', 'room', 'accepted', 'rejected']
+        widgets = {
+            'starts_at': DateTimeInput(attrs={
+                'type':'datetime-local'
+            }),
+            'expires_at': DateTimeInput(attrs={
+                'type': 'datetime-local'
+            })
+        }
+

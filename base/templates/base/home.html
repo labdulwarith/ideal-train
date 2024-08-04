@@ -1,41 +1,92 @@
-{% if user %}
-    <h4>Welcome {{ user.username }}</h4>
-{% else %}
-    <a href="{% url 'register' %}">Signup</a>
-    <a href="{% url 'login' %}">Login</a>
-{% endif %}
-<hr>
-Total number of rooms: {{ rooms_count }}
+{% extends 'main.html' %}
+{% block content %}
+<main class="container">
+    <div class="activities left-column">
+        <section class="card-list">
+            {% for room in search_rooms %}
+            <div>
+                <a href="{% url 'room' room.id %}" class="card-wrapper">
+                    <div class="card">
+                         <h3>{{ room.title }} by {{ room.host.username }}</h3>
+                        <p>{{ room.description }}</p>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </section>
+    </div>
+    <div class="rooms middle-column">
+        <section class="card-list">
+            <h2>Open Rooms</h2>
+                {% for room in open_rooms %}
+                <a href="{% url 'room' room.id %}" class="card-wrapper">
+                    <div class="card">
+                        <h3>{{ room.title }} by {{ room.host.username }}</h3>
+                        <p>{{ room.description }}</p>
+                    </div>
+                </a>
+            {% endfor %}
+            </section>
 
-<!--Only logged in users should see this panel-->
-{% if user.is_authenticated %}
+        <section class="card-list">
+                <h2>Closed rooms</h2>
+                {% for room in closed_rooms %}
+                <a href="{% url 'room' room.id %}" class="card-wrapper">
+                    <div class="card">
+                        <h3>{{ room.title }} by {{ room.host.username }}</h3>
+                        <p>{{ room.description }}</p>
+                    </div>
+                </a>
+                {% endfor %}
+            </section>
 
-    <h3>My rooms</h3>
-<!--    List of current logged in user's rooms -->
-    <ul>
-    {% for room in my_rooms %}
-        <li>
-            <a href="{% url 'room' room.id %}">{{ room.title }}</a>
-        </li>
-    {% endfor %}
-    </ul>
-    <hr>
+        <section class="card-list">
+                <h2>My rooms</h2>
+                {% for room in my_rooms %}
+                    <a href="{% url 'room' room.id %}" class="card-wrapper">
+                    <div class="card">
+                         <h3>{{ room.title }} by {{ room.host.username }}</h3>
+                        <p>{{ room.description }}</p>
+                    </div>
+                    </a>
+                {% endfor %}
+            </section>
+    </div>
+    <div class="all-notifications right-column">
 
-{% endif %}
-<!--List of open rooms -->
-    <h3>Open Rooms</h3>
-    <ul>
-        {% for room in open_rooms %}
-            <p>Join Room <a href="{% url 'join-room' room.id %}">{{ room.title }}</a></p>
-        {% endfor %}
-    </ul>
-    <hr>
-<!--List of closed rooms-->
-    <h3>Closed Rooms</h3>
-    <ul>
-        {% for room in closed_rooms %}
-            <p>Ask to join room  <a href="{% url 'join-room' room.id %}">{{ room.title }}</a></p>
-        {% endfor %}
-    </ul>
+        {% if notifications %}
+        <section class="notifications card-list">
+                <h4>My Notifications</h4>
+                {% for notif in notifications %}
+               <div class="notification-card card">
+                <h4><a href="{% url 'user-profile' notif.action_by.id %}">{{ notif.action_by.username }}</a> {% if notif.action_type == 'c' %} commented on {% else %} liked {% endif %} your <a href="{% url 'message' notif.message.id %}">message</a> in <a  href="{% url 'room' notif.room.id%}">{{ notif.room }}</a></h4>
+                <form method="POST" action="#">
+                    {% csrf_token %}
+                    <input type="hidden" name="notification_id" value="{{ notif.id }}" id="notification_id"/>
+                    <button type="submit" name="read-notification">Mark as read</button>
+                </form>
+                <hr>
+               </div>
+                {% endfor %}
+        </section>
+        {% endif %}
 
+        {% if admin_notifications %}
+        <section class="notifications card-list">
+            <h4> Admin Notifications</h4>
+            {% for notif in admin_notifications %}
+                <div class="notification-card card">
+                    <p><a href="{% url 'user-profile' notif.action_by.id %}">{{ notif.action_by.username }}</a> {% if notif.action_type == 'c' %} commented on {% else %} liked {% endif %} <a href="{% url 'user-profile' notif.action_to.id %}">{{ notif.action_to.username}}'s</a> <a href="{% url 'message' notif.message.id %}">message</a> in <a  href="{% url 'room' notif.room.id%}">{{ notif.room }}</a></p>
+                    <form method="POST" action="#">
+                        {% csrf_token %}
+                            <input type="hidden" name="admin_notification_id" value="{{ notif.id }}" id="admin_notification_id">
+                            <button type="submit" name="read-admin-notification">Mark as read</button>
+                    </form>
+                    </div>
+                {% endfor %}
+        </section>
+        {% endif %}
 
+    </div>
+</main>
+{% endblock %}

@@ -1,8 +1,20 @@
-<h3>Rooms hosted by {{ user.username }}</h3>
-<ul>
-    {% for room in rooms %}
-        <li>
-            <a href="{% url 'room' room.id %}">{{ room.title }}</a>
-        </li>
-    {% endfor %}
-</ul>
+{% extends 'main.html' %}
+{% block content %}
+    <main class="container">
+        <div></div>
+        <div>
+            <section class="card-list">
+            <h3>Rooms hosted by {{ user.username }}</h3>
+            {% for room in rooms %}
+            <div class="card">
+                <a href="{% url 'room' room.id %}">
+                    <h4>{{ room.title }}</h4></a>
+                    <p>{{ room.description }}</p>
+            </div>
+            {% endfor %}
+        </section>
+
+        </div>
+        <div></div>
+    </main>
+{% endblock %}

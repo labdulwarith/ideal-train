@@ -1,11 +1,20 @@
-<h4>Create a new poll</h4>
+{% extends 'main.html' %}
+{% block content %}
+<main class="container">
+    <div></div>
+    <div>
+        <h4>Create a new poll</h4>
 
-<form method="POST" action="#">
-    {% csrf_token %}
-    {% for field in poll_form %}
-        <label>{{ field.label }}</label>
-        {{ field }}
-    {% endfor %}
-    <button type="submit">Submit</button>
-</form>
+        <form method="POST" action="#">
+            {% csrf_token %}
+            {% for field in poll_form %}
+                <label>{{ field.label }}</label>
+                {{ field }}
+            {% endfor %}
+            <button type="submit">Submit</button>
+        </form>
 <a href="{% url 'user-profile' user.id %}"><button>Cancel</button></a>
+    </div>
+    <div></div>
+</main>
+{% endblock %}
