@@ -3,7 +3,6 @@ from django.contrib.auth import logout, login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.db.models import F, Q
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
@@ -48,13 +47,22 @@ def home(request):
         if request.method == 'POST':
             if 'read-notification' in request.POST:
                 notification = Notification.objects.get(id=request.POST.get('notification_id'))
-                notification.read_status = True
-                notification.save()
-            elif 'read-admin-notification' in request.POST:
+                if request.user != notification.action_to:
+                    error = 'Cannot process this request. not owner'
+                    return render(request, "base/error_page.html", {'error': error})
+                else:
+                    notification.read_status = True
+                    notification.save()
+                    return redirect('home')
+            if 'read-admin-notification' in request.POST:
                 admin_notification = AdminNotification.objects.get(id=request.POST.get('admin_notification_id'))
-                admin_notification.read_status = True
-                admin_notification.save()
-            return redirect('home')
+                if request.user not in admin_notification.room.admins.all():
+                    error = 'Cannot process this request, not owner'
+                    return render(request, "base/error_page.html", {'error': error})
+                else:
+                    admin_notification.read_status = True
+                    admin_notification.save()
+                    return redirect('home')
         my_rooms = Room.objects.filter(members=request.user)
         open_rooms = Room.objects.exclude(members=request.user).filter(open_status=True)
         closed_rooms = Room.objects.exclude(members=request.user).filter(open_status=False)
@@ -153,10 +161,15 @@ def update_room(request, pk):
 def room(request, pk):
     room = get_object_or_404(Room, id=pk)
 
-    if not request.user in room.members.all():
-        return HttpResponse('You are not allowed here')
+    if request.user not in room.members.all():
+        error = 'Not a member of this room'
+        return render(request, 'base/error_page.html', {'error': error})
 
     if request.method == 'POST':
+        if request.user not in room.admins.all():
+            error = 'Not an admin of this room'
+            return render(request, 'base/error_page.html', {'error': error})
+
         action = request.POST.get('action')
         user = User.objects.get(id=request.POST.get('user'))
         if action == 'accept':
@@ -164,8 +177,9 @@ def room(request, pk):
             room.members.add(user)
         else:
             room.pending_requests.remove(user)
+
         room.save()
-        redirect('room', pk=room.id)
+        return redirect('room', pk=room.id)
 
     room_messages = room.message_set.filter(hidden_status=False)
     hidden_messages = room.message_set.filter(hidden_status=True)
@@ -193,40 +207,45 @@ def room(request, pk):
 @login_required(login_url='login')
 def join_room(request, pk):
     room = get_object_or_404(Room, id=pk)
-    if request.user in room.members.all() or request.user in room.pending_requests.all():
-        return redirect('home')
 
-    if not room.open_status:
-        room.pending_requests.add(request.user)
+    if request.user in room.members.all():
         return redirect('home')
+    else:
+        if request.user not in room.pending_requests.all() and room.open_status == False:
+            room.pending_requests.add(request.user)
+            return redirect('home')
 
-    room.members.add(request.user)
-    return redirect('room', pk=room.id)
+        room.members.add(request.user)
+        return redirect('room', pk=room.id)
 
 @login_required(login_url='login')
 def delete_room(request, pk):
-    room = Room.objects.get(id=pk)
+    room = get_object_or_404(Room, id=pk)
     if request.user != room.host:
-        return HttpResponse('You are not allowed here!')
+        error = 'Not host of this room'
+        return render(request, 'base/error_page.html', {'error': error})
 
     if request.method == 'POST':
         room.delete()
-        return redirect('home')
 
-    return render('delete-room', 'base/delete_room.html', {'obj': room})
+    return redirect('home')
 
 @login_required(login_url='login')
 def user_profile(request, pk):
-    user = User.objects.get(id=pk)
-    rooms = user.room_set.all()
+    searched_user = get_object_or_404(User, id=pk)
+    rooms = searched_user.member_rooms.all()
 
-    context = {'user': user, 'rooms': rooms}
+    context = {'searched_user': searched_user, 'rooms': rooms}
 
     return render(request, 'base/profile.html', context)
 
 @login_required(login_url='login')
 def message(request, pk):
     message = get_object_or_404(Message, id=pk)
+
+    if request.user not in message.room.members.all():
+        error = 'Not a member of this room'
+        return render(request, 'base/error_page.html', {'error': error})
 
     if request.method == 'POST':
         if 'comment_submit' in request.POST:
@@ -257,8 +276,12 @@ def message(request, pk):
                 action_type='l'
             )
         elif 'hide_submit' in request.POST:
-                message.hidden_status = not message.hidden_status
-                message.save()
+            if request.user not in message.room.admins.all():
+                error = 'Not an admin. Request cannot be processed'
+                return render(request, 'base/error_page.html', {'error': error})
+
+            message.hidden_status = not message.hidden_status
+            message.save()
         return redirect('room', pk=message.room.id)
     else:
         comment_form = CommentForm()
@@ -280,6 +303,14 @@ def message(request, pk):
 def create_message(request, pk):
     room = get_object_or_404(Room, id=pk)
 
+    if request.user not in room.members.all():
+        error = 'Not a member of this room'
+        return render(request, "base/error_page.html", {'error': error})
+
+    if request.user in room.suspended_members.all():
+        error = 'Cannot make request, Suspended'
+        return render(request, "base/error_page.html", {'error': error})
+
     if request.method == 'POST':
         message_form = MessageForm(request.POST)
         if message_form.is_valid():
@@ -300,8 +331,14 @@ def create_message(request, pk):
 def poll(request, pk):
 
     poll = get_object_or_404(Poll, id=pk)
-    if not request.user in poll.room.members.all():
-        return HttpResponse('You are not allowed here')
+    if request.user not in poll.room.members.all():
+        error = 'Not a member of this polls room'
+        return render(request, "base/error_page.html", {'error': error})
+
+    if request.user in poll.room.suspended_members.all():
+        error = 'Cannot make this request, Suspended'
+        return render(request, "base/error_page.html", {'error': error})
+
     else:
         if request.method == 'POST':
             if 'vote' in request.POST:
@@ -349,7 +386,9 @@ def poll(request, pk):
 def create_poll(request, pk):
     poll_room = get_object_or_404(Room, id=pk)
     if not request.user in poll_room.admins.all():
-        return HttpResponse('You are not allowed to make this request')
+        error = 'Not an admin of this room'
+        return render(request, "base/error_page.html", {'error': error})
+
 
     if request.method == 'POST':
         poll_form = PollForm(request.POST.get('poll_form'))
@@ -369,38 +408,47 @@ def create_poll(request, pk):
 def event(request, pk):
     event = get_object_or_404(Event, id=pk)
     if not request.user in event.room.members.all():
-        return HttpResponse('You are not allowed to make this request')
+        error = 'Not a member of this room'
+        return render(request, "base/error_page.html", {'error': error})
 
-    if request.method == 'POST':
-        if event.has_ended():
-            return HttpResponse('Event has ended')
-        if request.user in event.accepted_set.all() or request.user in event.rejected_set.all():
-            return render(request, 'base/event.html', {
-                'event': event,
-                'error_message': 'You already accepted or rejected this event'
-            })
-        else:
-            if 'accepted' in request.POST:
-                #TODO: Send a notification to user
-                event.accepted.add(request.user)
-            elif 'rejected' in request.POST:
-                #TODO: Do not send notification
-                event.rejected.add(request.user)
-            return redirect('event', event.id)
     else:
-        context = {'event': event}
-        return render(request, 'base/event.html', context)
+        if request.method == 'POST':
+            if event.has_ended():
+                return render(request, 'base/event.html', {
+                    'event': event,
+                    'error_message': 'Event ended'
+                })
+            if request.user in event.accepted.all() or request.user in event.rejected.all():
+                return render(request, 'base/event.html', {
+                    'event': event,
+                    'error_message': 'You already accepted or rejected this event'
+                })
+            else:
+                if 'accepted' in request.POST:
+                    event.accepted.add(request.user)
+                elif 'rejected' in request.POST:
+                    event.rejected.add(request.user)
+                return redirect('event', event.id)
+        else:
+            context = {'event': event}
+            return render(request, 'base/event.html', context)
 
 @login_required(login_url='login')
 def create_event(request, pk):
     event_room = get_object_or_404(Room, id=pk)
-    if not request.user in event_room.admins.all():
-        return HttpResponse('You are not allowed to make this request')
+    if request.user not in event_room.admins.all():
+        error = 'Not an admin of this room'
+        return render(request, "base/error_page.html", {'error': error})
+
 
     if request.method == 'POST':
         event_form = EventForm(request.POST.get('event_form'))
         if event_form.is_valid():
             event = event_form.save(commit=False)
+            if event.has_ended() or event.starts_at > event.expires_at:
+                error = 'Invalid datetime settings'
+                return render(request, "base/error_page.html", {'error': error})
+
             event.created_by = request.user
             event.room = event_room
             event.save()

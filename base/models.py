@@ -9,8 +9,8 @@ class Room(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
     host = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    admins = models.ManyToManyField(User, related_name='admins', blank=True)
-    members = models.ManyToManyField(User, related_name='members', blank=True)
+    admins = models.ManyToManyField(User, related_name='admin_rooms', blank=True)
+    members = models.ManyToManyField(User, related_name='member_rooms', blank=True)
     open_status = models.BooleanField(default=True)
     updated = models.DateTimeField(auto_now=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -28,7 +28,7 @@ class Message(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     title = models.CharField(max_length=200, null=True, blank=True)
     body = models.TextField()
-    likes = models.ManyToManyField(User, related_name='likes', blank=True)
+    likes = models.ManyToManyField(User, related_name='liked_messages', blank=True)
     created = models.DateTimeField(auto_now_add=True)
     hidden_status = models.BooleanField(default=False)
 
@@ -58,8 +58,8 @@ class Event(models.Model):
     description = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
-    rejected = models.ManyToManyField(User, related_name='rejected', blank=True)
-    accepted = models.ManyToManyField(User, related_name='accepted', blank=True)
+    rejected = models.ManyToManyField(User, related_name='rejected_events', blank=True)
+    accepted = models.ManyToManyField(User, related_name='accepted_events', blank=True)
     starts_at = models.DateTimeField('Start time of event')
     expires_at = models.DateTimeField('End time of event')
 
@@ -82,7 +82,7 @@ class Poll(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     starts_at = models.DateTimeField('Start time of poll')
     expires_at = models.DateTimeField('End time of voting')
-    voted_users = models.ManyToManyField(User, related_name='voted_users', blank=True)
+    voted_users = models.ManyToManyField(User, related_name='voted_polls', blank=True)
 
     def __str__(self):
         return self.question
