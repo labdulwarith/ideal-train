@@ -1,7 +1,11 @@
-from django.forms import ModelForm, DateTimeInput
-from .models import Room, Comment, Poll, Message, Event
-
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+from django.forms import ModelForm, DateTimeInput
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
+from .models import Room, Comment, Poll, Message, Event, Choice
+
 
 
 class UserForm(ModelForm):
@@ -31,17 +35,15 @@ class CommentForm(ModelForm):
 class PollForm(ModelForm):
     class Meta:
         model = Poll
-        fields = '__all__'
-        exclude = ['created_by', 'voted_users', 'room']
+        fields = ['question', 'starts_at', 'expires_at']
         widgets = {
             'starts_at': DateTimeInput(attrs={
-                'type':'datetime-local'
+                'type': 'datetime-local'
             }),
             'expires_at': DateTimeInput(attrs={
                 'type': 'datetime-local'
             })
         }
-
 
 class EventForm(ModelForm):
     class Meta:
@@ -49,10 +51,17 @@ class EventForm(ModelForm):
         exclude = ['created_by', 'room', 'accepted', 'rejected']
         widgets = {
             'starts_at': DateTimeInput(attrs={
-                'type':'datetime-local'
+                'type': 'datetime-local'
             }),
             'expires_at': DateTimeInput(attrs={
                 'type': 'datetime-local'
             })
         }
+
+
+class ChoiceForm(ModelForm):
+    class Meta:
+        model = Choice
+        fields = ['text']
+
 

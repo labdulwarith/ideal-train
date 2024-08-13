@@ -2,12 +2,14 @@ from django.contrib import messages
 from django.contrib.auth import logout, login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
-from django.contrib.auth.models import User
 
-from .forms import RoomForm, CommentForm, MessageForm, PollForm, EventForm
+
+from .forms import RoomForm, CommentForm, MessageForm, PollForm, EventForm, ChoiceForm
 from .models import Room, Message, Comment, Event, Choice, Poll, Notification, AdminNotification
 
 # Create your views here.
@@ -345,26 +347,24 @@ def poll(request, pk):
                 if request.user in poll.voted_users.all():
                     return render(
                         request,
-                        'base/poll.html',
+                        'base/error_page.html',
                         {
                             'poll': poll,
                             'error_message': 'You already voted on this poll'
                         }
                     )
-
-                try:
-                    selected_choice = poll.choice_set.get(id=request.POST['choice'])
-
-                except(KeyError, Choice.DoesNotExist):
-                    return render(
-                        request,
-                        'base/poll.html',
-                        {
-                            'poll': poll,
-                            'error_message': 'You did not select a choice'
-                        }
-                    )
                 else:
+                    try:
+                        selected_choice = poll.choice_set.get(id=request.POST['choice'])
+                    except(KeyError, Choice.DoesNotExist):
+                        return render(
+                            request,
+                            'base/poll.html',
+                            {
+                                'poll': poll,
+                                'error_message': 'You did not select a choice'
+                            }
+                        )
                     selected_choice.votes = F('votes') + 1
                     selected_choice.save()
                     poll.voted_users.add(request.user)
@@ -378,22 +378,26 @@ def poll(request, pk):
                         }
                     )
         context = {
-                'poll': poll
-            }
+            'poll': poll
+        }
         return render(request, 'base/poll.html', context)
+
 
 @login_required(login_url='login')
 def create_poll(request, pk):
     poll_room = get_object_or_404(Room, id=pk)
-    if not request.user in poll_room.admins.all():
+    if request.user not in poll_room.admins.all():
         error = 'Not an admin of this room'
         return render(request, "base/error_page.html", {'error': error})
 
-
     if request.method == 'POST':
-        poll_form = PollForm(request.POST.get('poll_form'))
+        poll_form = PollForm(request.POST)
         if poll_form.is_valid():
             poll = poll_form.save(commit=False)
+            if poll.has_ended() or poll.starts_at >= poll.expires_at:
+                return render(request, 'base/error_page.html', {
+                    'error': 'Invalid datetime settings'
+                })
             poll.created_by = request.user
             poll.room = poll_room
             poll.save()
@@ -404,10 +408,11 @@ def create_poll(request, pk):
             'poll_form': poll_form
         }
         return render(request, 'base/poll_form.html', context)
+
 @login_required(login_url='login')
 def event(request, pk):
     event = get_object_or_404(Event, id=pk)
-    if not request.user in event.room.members.all():
+    if request.user not in event.room.members.all():
         error = 'Not a member of this room'
         return render(request, "base/error_page.html", {'error': error})
 
@@ -428,10 +433,12 @@ def event(request, pk):
                     event.accepted.add(request.user)
                 elif 'rejected' in request.POST:
                     event.rejected.add(request.user)
-                return redirect('event', event.id)
+                return redirect('event', pk=event.id)
+
         else:
             context = {'event': event}
             return render(request, 'base/event.html', context)
+
 
 @login_required(login_url='login')
 def create_event(request, pk):
@@ -440,23 +447,48 @@ def create_event(request, pk):
         error = 'Not an admin of this room'
         return render(request, "base/error_page.html", {'error': error})
 
-
     if request.method == 'POST':
-        event_form = EventForm(request.POST.get('event_form'))
+        event_form = EventForm(request.POST)
         if event_form.is_valid():
             event = event_form.save(commit=False)
-            if event.has_ended() or event.starts_at > event.expires_at:
+            if event.has_ended() or event.starts_at >= event.expires_at:
                 error = 'Invalid datetime settings'
                 return render(request, "base/error_page.html", {'error': error})
-
             event.created_by = request.user
             event.room = event_room
             event.save()
-
             return redirect('event', pk=event.id)
+
     else:
         event_form = EventForm()
         context = {
             'event_form': event_form
         }
         return render(request, 'base/event_form.html', context)
+
+
+@login_required(login_url='login')
+def create_choice(request, pk):
+    choice_poll = get_object_or_404(Poll, id=pk)
+    if request.user != choice_poll.created_by:
+        error = 'Not owner of this poll'
+        return render(request, "base/error_page.html", {'error': error})
+
+    if choice_poll.has_ended():
+        error = 'Poll ended'
+        return render(request, "base/error_page.html", {'error': error})
+
+    if request.method == 'POST':
+        choice_form = ChoiceForm(request.POST)
+        if choice_form.is_valid():
+            choice = choice_form.save(commit=False)
+            choice.poll = choice_poll
+            choice.save()
+            return redirect('poll', pk=pk)
+    else:
+        choice_form = ChoiceForm()
+
+        return render(request, 'base/choice_form.html', {
+            'choice_form': choice_form
+        }
+                      )

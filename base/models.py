@@ -1,4 +1,3 @@
-from enum import Enum
 from django.contrib.auth.models import User
 from django import forms
 from django.db import models
@@ -103,8 +102,6 @@ class Choice(models.Model):
 
     def __str__(self):
         return self.text
-    class Meta:
-        ordering = ['votes', '-text']
 
 ACTION_TYPE = (
     ('c', 'commented'),
@@ -123,6 +120,8 @@ class Notification(models.Model):
         default='c',
         help_text='Description of notification'
     )
+    def __str__(self):
+        return str(self.action_by) + ' to ' + str(self.action_to)
 
 class AdminNotification(models.Model):
     read_status = models.BooleanField(default=False)
@@ -137,3 +136,5 @@ class AdminNotification(models.Model):
         help_text='Description of admin notification'
     )
 
+    def __str__(self):
+        return str(self.action_by) + ' to ' + str(self.action_to)

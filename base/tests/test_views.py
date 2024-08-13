@@ -293,6 +293,7 @@ class JoinRoomViewTests(TestCase):
         self.assertRedirects(response, reverse('home'))
 
 
+
 class DeleteRoomViewTests(TestCase):
     def setUp(self):
         test_user1 = User.objects.create_user(
@@ -334,6 +335,7 @@ class DeleteRoomViewTests(TestCase):
         response = self.client.post(reverse('delete-room', kwargs={'pk': self.test_room1.id}))
         self.assertEqual(Room.objects.all().count(), 0)
         self.assertRedirects(response, reverse('home'))
+
 
 
 class UserProfileViewTests(TestCase):
@@ -378,6 +380,7 @@ class UserProfileViewTests(TestCase):
         response = self.client.get(reverse('user-profile', kwargs={'pk': self.test_user2.id}))
         self.assertEqual(str(response.context['user']), 'testuser2')
         self.assertTemplateUsed(response, 'base/profile.html')
+
 
 
 class MessageDetailViewTests(TestCase):
@@ -487,6 +490,7 @@ class MessageDetailViewTests(TestCase):
         self.assertTemplateUsed(response, 'base/message.html')
 
 
+
 class CreateMessageViewTests(TestCase):
     def setUp(self):
         test_user1 = User.objects.create_user(
@@ -564,7 +568,7 @@ class CreateMessageViewTests(TestCase):
 
 class PollDetailViewTests(TestCase):
     def setUp(self):
-        test_user1 = User.objects.create_user(
+        self.test_user1 = User.objects.create_user(
             username='testuser1',
             password='@95lasfasfAf'
         )
@@ -578,23 +582,23 @@ class PollDetailViewTests(TestCase):
             password='@95lasfasfAf'
         )
 
-        test_user1.save()
+        self.test_user1.save()
         test_user2.save()
         test_user3.save()
 
         test_room1 = Room.objects.create(
             title='Test room 1',
-            host=test_user1,
+            host=self.test_user1,
         )
-        test_room1.admins.add(*[test_user1])
-        test_room1.members.add(*[test_user1, test_user2])
+        test_room1.admins.add(*[self.test_user1])
+        test_room1.members.add(*[self.test_user1, test_user2])
         test_room1.suspended_members.add(*[test_user2])
         test_room1.save()
 
         self.test_poll1 = Poll.objects.create(
             question='Test poll 1',
             room=test_room1,
-            created_by=test_user1,
+            created_by=self.test_user1,
             starts_at=timezone.now(),
             expires_at=datetime.timedelta(days=1) + timezone.now()
         )
@@ -602,25 +606,25 @@ class PollDetailViewTests(TestCase):
         self.test_poll2 = Poll.objects.create(
             question='Test poll 2',
             room=test_room1,
-            created_by=test_user1,
+            created_by=self.test_user1,
             starts_at=timezone.now(),
             expires_at=datetime.timedelta(days=1) + timezone.now(),
         )
-        self.test_poll2.voted_users.add(*[test_user2])
+        self.test_poll2.voted_users.add(*[self.test_user1])
         self.test_poll1.save()
         self.test_poll2.save()
 
-        test_choice1 = Choice.objects.create(
+        self.test_choice1 = Choice.objects.create(
             text='Test choice 1 for poll1',
             poll=self.test_poll1,
         )
-        test_choice2 = Choice.objects.create(
+        self.test_choice2 = Choice.objects.create(
             text='Test choice 2 for poll2',
             poll=self.test_poll2,
         )
 
-        test_choice1.save()
-        test_choice2.save()
+        self.test_choice1.save()
+        self.test_choice2.save()
 
     def test_deny_unauthorized_user_from_poll(self):
         login = self.client.login(
@@ -632,35 +636,34 @@ class PollDetailViewTests(TestCase):
         self.assertEqual(response.context['error'], 'Not a member of this polls room')
         self.assertTemplateUsed(response, 'base/error_page.html')
 
-    @skip('Not passed in vote form values')
+
     def test_allow_authorized_user_to_vote_poll(self):
         login = self.client.login(
             username='testuser1',
             password='@95lasfasfAf'
         )
-        response = self.client.post(reverse('poll', kwargs={'pk': self.test_poll1.id}))
+        response = self.client.post(reverse('poll', kwargs={'pk': self.test_poll1.id}),
+                                    {
+                                        'vote': 'vote',
+                                        'choice': self.test_choice1.id
+                                    })
         self.assertEqual(str(response.context['user']), 'testuser1')
-        self.assertEqual(response.status_code, 200)
-        #TODO: Implement passing choice into the request and assert for it
+        self.assertEqual(Choice.objects.get(id=self.test_choice1.id).votes, 1)
+        self.assertIn(self.test_user1, self.test_poll1.voted_users.all())
 
-    @skip('Not passed in vote form values')
-    def test_redirects_to_correct_url_after_voting(self):
-        login = self.client.login(
-            username='testuser1',
-            password='@95lasfasfAf'
-        )
-        #TODO: Implement passing choice into the request and assert
-        response = self.client.post(reverse('poll', kwargs={'pk': self.test_poll1.id}),{})
-        self.assertEqual(str(response.context['user']), 'testuser1')
 
-    @skip('Not passed in vote form values')
     def test_does_not_allow_already_voted_user_to_vote(self):
         login = self.client.login(
             username='testuser1',
             password='@95lasfasfAf'
         )
-        response = self.client.post(reverse('poll', kwargs={'pk': self.test_poll2.id}),{})
+        response = self.client.post(reverse('poll', kwargs={'pk': self.test_poll2.id}),
+                                    {
+                                        'vote': 'vote',
+                                        'choice': self.test_choice2.id
+                                    })
         self.assertEqual(str(response.context['user']), 'testuser1')
+        self.assertEqual(Choice.objects.get(id=self.test_choice2.id).votes, 0)
         self.assertEqual(response.context['error_message'], 'You already voted on this poll')
 
     def test_renders_correct_template_for_authorized_user(self):
@@ -672,23 +675,82 @@ class PollDetailViewTests(TestCase):
         self.assertEqual(str(response.context['user']), 'testuser1')
         self.assertTemplateUsed(response, 'base/poll.html')
 
-@skip('Done')
+
+
 class CreatePollViewTests(TestCase):
 
     def setUp(self):
-        pass
+        test_user1 = User.objects.create_user(
+            username='testuser1',
+            password='@95lasfasfAf'
+        )
+        test_user2 = User.objects.create_user(
+            username='testuser2',
+            password='@95lasfasfAf'
+        )
+
+        test_user1.save()
+        test_user2.save()
+
+        self.test_room1 = Room.objects.create(
+            title='Test room 1',
+            host=test_user1
+        )
+
+        self.test_room1.admins.add(*[test_user1])
+        self.test_room1.members.add(*[test_user1, test_user2])
+        self.test_room1.save()
+
 
     def test_deny_non_admin_from_creating_poll(self):
-        pass
+        login = self.client.login(
+            username="testuser2",
+            password="@95lasfasfAf"
+        )
+        response = self.client.get(reverse('create-poll', kwargs={'pk': self.test_room1.id}))
+        self.assertEqual(str(response.context['user']), 'testuser2')
+        self.assertEqual(response.context['error'], 'Not an admin of this room')
+        self.assertTemplateUsed(response, 'base/error_page.html')
+
 
     def test_render_correct_template_for_authorized_user(self):
-        pass
+        login = self.client.login(
+            username="testuser1",
+            password="@95lasfasfAf"
+        )
+        response = self.client.get(reverse('create-poll', kwargs={'pk': self.test_room1.id}))
+        self.assertEqual(str(response.context['user']), 'testuser1')
+        self.assertTemplateUsed(response, 'base/poll_form.html')
 
     def test_deny_incorrect_date_setting(self):
-        pass
+        login = self.client.login(
+            username="testuser1",
+            password="@95lasfasfAf"
+        )
+        response = self.client.post(reverse('create-poll', kwargs={'pk': self.test_room1.id}), {
+                'starts_at': timezone.now(),
+                'expires_at': timezone.now() - datetime.timedelta(days=2),
+                'question': 'Test invalid poll'
+        })
+        self.assertEqual(str(response.context['user']), 'testuser1')
+        self.assertEqual(response.context['error'], 'Invalid datetime settings')
+        self.assertTemplateUsed(response, 'base/error_page.html')
+
 
     def test_create_poll_with_correct_datetime_setting(self):
-        pass
+        login = self.client.login(
+            username="testuser1",
+            password="@95lasfasfAf"
+        )
+        response = self.client.post(reverse('create-poll', kwargs={'pk': self.test_room1.id}),
+                {
+                'starts_at': timezone.now() + datetime.timedelta(1),
+                'expires_at': timezone.now() + datetime.timedelta(days=5),
+                'question': 'Test valid poll'
+                }
+            )
+        self.assertRedirects(response, reverse('poll', kwargs={'pk': 1}))
+        self.assertEqual(self.test_room1.poll_set.count(), 1)
 
 
 class EventDetailViewTests(TestCase):
@@ -836,8 +898,14 @@ class CreateEventViewTests(TestCase):
         self.assertTemplateUsed(response, 'base/error_page.html')
 
     def test_correct_template_is_returned_valid_request(self):
-        login = self
-    @skip('not done')
+        login = self.client.login(
+            username='testuser1',
+            password='@95lasfasfAf'
+        )
+        response = self.client.get(reverse('create-event', kwargs={'pk': self.test_room1.id}))
+        self.assertEqual(str(response.context['user']), 'testuser1')
+        self.assertTemplateUsed(response, 'base/event_form.html')
+
     def test_deny_post_request_with_invalid_datetime(self):
         login = self.client.login(
             username='testuser1',
@@ -852,15 +920,7 @@ class CreateEventViewTests(TestCase):
                                     })
         self.assertEqual(response.context['error'], 'Invalid datetime settings')
         self.assertTemplateUsed(response, 'base/error_page.html')
-        login = self.client.login(
-            username='testuser1',
-            password='@95lasfasfAf'
-        )
 
-        response = self.client.get(reverse('create-event', kwargs={'pk': self.test_room1.id}))
-        self.assertEqual(str(response.context['user']), 'testuser1')
-        self.assertTemplateUsed(response, 'base/event_form.html')
-    @skip('not done')
     def test_create_new_event_with_valid_datetime(self):
         login = self.client.login(
             username='testuser1',
@@ -872,6 +932,6 @@ class CreateEventViewTests(TestCase):
                                         'expires_at': datetime.timedelta(days=2) + timezone.now(),
                                         'title': 'Test valid event'
                                     })
-        self.assertEqual(self.test_room1.events_set().count(), 1)
+        self.assertEqual(self.test_room1.event_set.count(), 1)
         self.assertRedirects(response, reverse('event', kwargs={'pk': 1}))
 
